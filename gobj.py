@@ -8,479 +8,488 @@ import re
 __commander_module__ = True
 
 class ParamSpec:
-	def __init__(self, name, nick, desc, flags):
-		self.name = name
-		self.nick = nick
-		self.desc = desc
-		self.flags = flags
+    def __init__(self, name, nick, desc, flags):
+        self.name = name
+        self.nick = nick
+        self.desc = desc
+        self.flags = flags
 
-		self.args = []
+        self.args = []
 
-	def prop_enum(self):
-		return 'PROP_' + self.name.upper().replace('-', '_')
+    def prop_enum(self):
+        return 'PROP_' + self.name.upper().replace('-', '_')
 
-	def read(self):
-		pass
+    def read(self):
+        pass
 
-	def spec_name(self):
-		return self.__class__.__name__.lstrip('ParamSpec').lower()
+    def spec_name(self):
+        return self.__class__.__name__.lstrip('ParamSpec').lower()
 
-	def format_str(self, s):
-		if s.startswith('"') or s.startswith('_("'):
-			return s
+    def format_str(self, s):
+        if s.startswith('"') or s.startswith('_("'):
+            return s
 
-		return '"%s"' % (s.replace('"', '\\"'),)
+        return '"%s"' % (s.replace('"', '\\"'),)
 
-	def __str__(self):
-		name = "g_param_spec_" + self.spec_name()
-		indent = " " * (len(name) + 2)
+    def __str__(self):
+        name = "g_param_spec_" + self.spec_name()
+        indent = " " * (len(name) + 2)
 
-		argstr = ''
+        argstr = ''
 
-		if self.args:
-			ret = (",\n%s" % (indent,)).join(map(lambda x: str(x), self.args))
-			argstr = "\n%s%s," % (indent, ret)
+        if self.args:
+            ret = (",\n%s" % (indent,)).join(map(lambda x: str(x), self.args))
+            argstr = "\n%s%s," % (indent, ret)
 
-		return "%s (%s,\n%s%s,\n%s%s,%s\n%s%s)" % (name,
-		                                         self.format_str(self.name),
-		                                         indent,
-		                                         self.format_str(self.nick),
-		                                         indent,
-		                                         self.format_str(self.desc),
-		                                         argstr,
-		                                         indent,
-		                                         self.flags)
+        return "%s (%s,\n%s%s,\n%s%s,%s\n%s%s)" % (name,
+                                                 self.format_str(self.name),
+                                                 indent,
+                                                 self.format_str(self.nick),
+                                                 indent,
+                                                 self.format_str(self.desc),
+                                                 argstr,
+                                                 indent,
+                                                 self.flags)
 
-	def write(self):
-		delim = "\n" + (" " * 33)
-		spec = delim.join(str(self).splitlines())
+    def write(self):
+        delim = "\n" + (" " * 33)
+        spec = delim.join(str(self).splitlines())
 
-		return """
+        return """
 g_object_class_install_property (object_class,
                                  %s,
                                  %s);""" % (self.prop_enum(), spec)
 
 class ParamSpecTyped(ParamSpec):
-	def __init__(self, name, nick, desc, flags):
-		ParamSpec.__init__(self, name, nick, desc, flags)
+    def __init__(self, name, nick, desc, flags):
+        ParamSpec.__init__(self, name, nick, desc, flags)
 
-	def read(self):
-		typ, words, modifier = (yield commander.commands.result.Prompt('Type:'))
-		self.args.append(typ)
+    def read(self):
+        typ, words, modifier = (yield commander.commands.result.Prompt('Type:'))
+        self.args.append(typ)
 
-		yield True
+        yield True
 
 class ParamSpecBoolean(ParamSpec):
-	def __init__(self, name, nick, desc, flags):
-		ParamSpec.__init__(self, name, nick, desc, flags)
+    def __init__(self, name, nick, desc, flags):
+        ParamSpec.__init__(self, name, nick, desc, flags)
 
-	def read(self):
-		comp = {'*': commander.commands.completion.words(['TRUE', 'FALSE'])}
+    def read(self):
+        comp = {'*': commander.commands.completion.words(['TRUE', 'FALSE'])}
 
-		default, words, modifier = (yield commander.commands.result.Prompt('Default value [TRUE]:', comp))
+        default, words, modifier = (yield commander.commands.result.Prompt('Default value [TRUE]:', comp))
 
-		if default.lower() != 'false':
-			self.args = ['TRUE']
-		else:
-			self.args = ['FALSE']
+        if default.lower() != 'false':
+            self.args = ['TRUE']
+        else:
+            self.args = ['FALSE']
 
-		yield True
+        yield True
 
 class ParamSpecBoxed(ParamSpecTyped):
-	def __init__(self, name, nick, desc, flags):
-		ParamSpecTyped.__init__(self, name, nick, desc, flags)
+    def __init__(self, name, nick, desc, flags):
+        ParamSpecTyped.__init__(self, name, nick, desc, flags)
 
 class ParamSpecNumeric(ParamSpec):
-	def __init__(self, name, nick, desc, flags):
-		ParamSpec.__init__(self, name, nick, desc, flags)
+    def __init__(self, name, nick, desc, flags):
+        ParamSpec.__init__(self, name, nick, desc, flags)
 
-	def min_value(self):
-		return '0'
+    def min_value(self):
+        return '0'
 
-	def max_value(self):
-		return '0'
+    def max_value(self):
+        return '0'
 
-	def default_value(self):
-		return '0'
+    def default_value(self):
+        return '0'
 
-	def read(self):
-		minv, words, modifier = (yield commander.commands.result.Prompt('Min [' + self.min_value() + ']:'))
-		maxv, words, modifier = (yield commander.commands.result.Prompt('Max [' + self.max_value() + ']:'))
-		default, words, modifier = (yield commander.commands.result.Prompt('Default [' + self.default_value() + ']:'))
+    def read(self):
+        minv, words, modifier = (yield commander.commands.result.Prompt('Min [' + self.min_value() + ']:'))
+        maxv, words, modifier = (yield commander.commands.result.Prompt('Max [' + self.max_value() + ']:'))
+        default, words, modifier = (yield commander.commands.result.Prompt('Default [' + self.default_value() + ']:'))
 
-		if not minv:
-			minv = self.min_value()
+        if not minv:
+            minv = self.min_value()
 
-		if not maxv:
-			maxv = self.max_value()
+        if not maxv:
+            maxv = self.max_value()
 
-		if not default:
-			default = self.default_value()
+        if not default:
+            default = self.default_value()
 
-		self.args = [minv, maxv, default]
+        self.args = [minv, maxv, default]
 
-		yield True
+        yield True
 
 class ParamSpecDouble(ParamSpecNumeric):
-	def __init__(self, name, nick, desc, flags):
-		ParamSpecNumeric.__init__(self, name, nick, desc, flags)
+    def __init__(self, name, nick, desc, flags):
+        ParamSpecNumeric.__init__(self, name, nick, desc, flags)
 
-	def min_value(self):
-		return 'G_MINDOUBLE'
+    def min_value(self):
+        return 'G_MINDOUBLE'
 
-	def max_value(self):
-		return 'G_MAXDOUBLE'
+    def max_value(self):
+        return 'G_MAXDOUBLE'
 
 class ParamSpecEnum(ParamSpecTyped):
-	def __init__(self, name, nick, desc, flags):
-		ParamSpec.__init__(self, name, nick, desc, flags)
+    def __init__(self, name, nick, desc, flags):
+        ParamSpec.__init__(self, name, nick, desc, flags)
 
-	def read(self):
-		ParamSpecTyped.read(self)
+    def read(self):
+        ParamSpecTyped.read(self)
 
-		default, words, modifier = (yield commander.commands.result.Prompt('Default: [0]'))
+        default, words, modifier = (yield commander.commands.result.Prompt('Default: [0]'))
 
-		if default == '':
-			default = '0'
+        if default == '':
+            default = '0'
 
-		self.args.append(default)
+        self.args.append(default)
 
-		yield True
+        yield True
 
 class ParamSpecFlags(ParamSpecEnum):
-	def __init__(self, name, nick, desc, flags):
-		ParamSpecEnum.__init__(self, name, nick, desc, flags)
+    def __init__(self, name, nick, desc, flags):
+        ParamSpecEnum.__init__(self, name, nick, desc, flags)
 
 class ParamSpecFloat(ParamSpecNumeric):
-	def __init__(self, name, nick, desc, flags):
-		ParamSpecNumeric.__init__(self, name, nick, desc, flags)
+    def __init__(self, name, nick, desc, flags):
+        ParamSpecNumeric.__init__(self, name, nick, desc, flags)
 
-	def min_value(self):
-		return 'G_MINFLOAT'
+    def min_value(self):
+        return 'G_MINFLOAT'
 
-	def max_value(self):
-		return 'G_MAXFLOAT'
+    def max_value(self):
+        return 'G_MAXFLOAT'
 
 class ParamSpecInt(ParamSpecNumeric):
-	def __init__(self, name, nick, desc, flags):
-		ParamSpecNumeric.__init__(self, name, nick, desc, flags)
+    def __init__(self, name, nick, desc, flags):
+        ParamSpecNumeric.__init__(self, name, nick, desc, flags)
 
-	def min_value(self):
-		return 'G_MININT'
+    def min_value(self):
+        return 'G_MININT'
 
-	def max_value(self):
-		return 'G_MAXINT'
+    def max_value(self):
+        return 'G_MAXINT'
 
 class ParamSpecUInt(ParamSpecNumeric):
-	def __init__(self, name, nick, desc, flags):
-		ParamSpecNumeric.__init__(self, name, nick, desc, flags)
+    def __init__(self, name, nick, desc, flags):
+        ParamSpecNumeric.__init__(self, name, nick, desc, flags)
 
-	def min_value(self):
-		return '0'
+    def min_value(self):
+        return '0'
 
-	def max_value(self):
-		return 'G_MAXUINT'
+    def max_value(self):
+        return 'G_MAXUINT'
 
 class ParamSpecObject(ParamSpecTyped):
-	def __init__(self, name, nick, desc, flags):
-		ParamSpecTyped.__init__(self, name, nick, desc, flags)
+    def __init__(self, name, nick, desc, flags):
+        ParamSpecTyped.__init__(self, name, nick, desc, flags)
 
 class ParamSpecPointer(ParamSpec):
-	def __init__(self, name, nick, desc, flags):
-		ParamSpec.__init__(self, name, nick, desc, flags)
+    def __init__(self, name, nick, desc, flags):
+        ParamSpec.__init__(self, name, nick, desc, flags)
 
 class ParamSpecString(ParamSpec):
-	def __init__(self, name, nick, desc, flags):
-		ParamSpec.__init__(self, name, nick, desc, flags)
+    def __init__(self, name, nick, desc, flags):
+        ParamSpec.__init__(self, name, nick, desc, flags)
 
-	def read(self):
-		default, words, modifier = (yield commander.commands.result.Prompt('Default [""]:'))
+    def read(self):
+        default, words, modifier = (yield commander.commands.result.Prompt('Default [""]:'))
 
-		if not default:
-			default = '""'
+        if not default:
+            default = '""'
 
-		if not default.startswith('"') and not default.startswith('_("'):
-			default = '"' + default.replace('"', '\\"') + '"'
+        if not default.startswith('"') and not default.startswith('_("'):
+            default = '"' + default.replace('"', '\\"') + '"'
 
-		yield True
+        yield True
 
 _prop_types = {
-	'boolean': ParamSpecBoolean,
-	'boxed': ParamSpecBoxed,
-	'double': ParamSpecDouble,
-	'enum': ParamSpecEnum,
-	'flags': ParamSpecFlags,
-	'float': ParamSpecFloat,
-	'int': ParamSpecInt,
-	'object': ParamSpecObject,
-	'pointer': ParamSpecPointer,
-	'string': ParamSpecString,
-	'uint': ParamSpecUInt
+    'boolean': ParamSpecBoolean,
+    'boxed': ParamSpecBoxed,
+    'double': ParamSpecDouble,
+    'enum': ParamSpecEnum,
+    'flags': ParamSpecFlags,
+    'float': ParamSpecFloat,
+    'int': ParamSpecInt,
+    'object': ParamSpecObject,
+    'pointer': ParamSpecPointer,
+    'string': ParamSpecString,
+    'uint': ParamSpecUInt
 }
 
 def __default__(view, entry):
-	pass
+    """GObject utilities
+
+Utility functions for GObject C files."""
+    pass
 
 def _find_regex_per_line(buf, regex, start=None):
-	if not start:
-		start = buf.get_start_iter()
+    if not start:
+        start = buf.get_start_iter()
 
-	if isinstance(regex, str) or isinstance(regex, unicode):
-		regex = re.compile(regex)
+    if isinstance(regex, str) or isinstance(regex, unicode):
+        regex = re.compile(regex)
 
-	while True:
-		end = start.copy()
+    while True:
+        end = start.copy()
 
-		if not end.ends_line():
-			end.forward_to_line_end()
+        if not end.ends_line():
+            end.forward_to_line_end()
 
-		text = start.get_text(end)
+        text = start.get_text(end)
 
-		m = regex.search(text)
+        m = regex.search(text)
 
-		if m:
-			end = start.copy()
-			start.forward_chars(m.start(0))
-			end.forward_chars(m.end(0))
+        if m:
+            end = start.copy()
+            start.forward_chars(m.start(0))
+            end.forward_chars(m.end(0))
 
-			return [start, end, m]
+            return [start, end, m]
 
-		if not start.forward_line():
-			break
+        if not start.forward_line():
+            break
 
-	return None
+    return None
 
 def _find_regex(buf, regex, start=None):
-	if not start:
-		start = buf.get_start_iter()
+    if not start:
+        start = buf.get_start_iter()
 
-	end = buf.get_end_iter()
-	text = start.get_text(end)
+    end = buf.get_end_iter()
+    text = start.get_text(end)
 
-	if isinstance(regex, str) or isinstance(regex, unicode):
-		regex = re.compile(regex)
+    if isinstance(regex, str) or isinstance(regex, unicode):
+        regex = re.compile(regex)
 
-	m = regex.search(text)
+    m = regex.search(text)
 
-	if m:
-		end = start.copy()
-		start.forward_chars(m.start(0))
-		end.forward_chars(m.end(0))
+    if m:
+        end = start.copy()
+        start.forward_chars(m.start(0))
+        end.forward_chars(m.end(0))
 
-		return [start, end, m]
+        return [start, end, m]
 
-	return None
+    return None
 
 def _find_prop_enum(buf):
-	ret = _find_regex_per_line(buf, '^\s*PROP_0\\s*,')
+    ret = _find_regex_per_line(buf, '^\s*PROP_0\\s*,')
 
-	if ret:
-		ret = _find_regex_per_line(buf, '^};$', ret[1])
+    if ret:
+        ret = _find_regex_per_line(buf, '^};$', ret[1])
 
-		if not ret:
-			return None
+        if not ret:
+            return None
 
-		ret[0].backward_char()
-		return ret[0]
-	else:
-		ret = _find_regex_per_line(buf, '^\s*G_DEFINE_(DYNAMIC_|ABSTRACT_)?TYPE')
+        ret[0].backward_char()
+        return ret[0]
+    else:
+        ret = _find_regex_per_line(buf, '^\s*G_DEFINE_(DYNAMIC_|ABSTRACT_)?TYPE')
 
-		if not ret:
-			return None
+        if not ret:
+            return None
 
-		ret = _find_regex_per_line(buf, '^$', ret[1])
+        ret = _find_regex_per_line(buf, '^$', ret[1])
 
-		if not ret:
-			return None
+        if not ret:
+            return None
 
-		start = ret[0]
-		buf.insert(start, "\nenum\n{\n\tPROP_0\n};\n")
-		start.backward_chars(4)
+        start = ret[0]
+        buf.insert(start, "\nenum\n{\n\tPROP_0\n};\n")
+        start.backward_chars(4)
 
-		return start
+        return start
 
 def _get_type_name(buf):
-	ret = _find_regex_per_line(buf, '^\s*G_DEFINE_(?:DYNAMIC_|ABSTRACT_)?TYPE[^(]*\\(\s*([A-Za-z_0-9]+)')
+    ret = _find_regex_per_line(buf, '^\s*G_DEFINE_(?:DYNAMIC_|ABSTRACT_)?TYPE[^(]*\\(\s*([A-Za-z_0-9]+)')
 
-	if ret:
-		camel = ret[2].group(1)
-		parts = re.findall('[A-Z]+[a-z0-9]*', camel)
+    if ret:
+        camel = ret[2].group(1)
+        parts = re.findall('[A-Z]+[a-z0-9]*', camel)
 
-		return camel, parts
+        return camel, parts
 
 def _find_class_init(buf, namespec):
-	funcprefix = '_'.join(namespec[1]).lower()
+    funcprefix = '_'.join(namespec[1]).lower()
 
-	ret = _find_regex(buf, 'static\s+void\s+%s_class_init\s*\\(' % (funcprefix, ))
+    ret = _find_regex(buf, 'static\s+void\s+%s_class_init\s*\\(' % (funcprefix, ))
 
-	if not ret:
-		return None
+    if not ret:
+        return None
 
-	return ret[0]
+    return ret[0]
 
 def _find_prop_get_set(buf, namespec, isget):
-	funcprefix = '_'.join(namespec[1]).lower()
+    funcprefix = '_'.join(namespec[1]).lower()
 
-	if isget:
-		pref = 'get'
-	else:
-		pref = 'set'
+    if isget:
+        pref = 'get'
+    else:
+        pref = 'set'
 
-	ret = _find_regex_per_line(buf, '%s_%s_property\s*\\(' % (funcprefix, pref))
+    ret = _find_regex_per_line(buf, '%s_%s_property\s*\\(' % (funcprefix, pref))
 
-	if not ret:
-		ret = _find_class_init(buf, namespec)
+    if not ret:
+        ret = _find_class_init(buf, namespec)
 
-		if not ret:
-			return None
+        if not ret:
+            return None
 
-		mark = buf.create_mark(None, ret, True)
+        mark = buf.create_mark(None, ret, True)
 
-		ret = _find_regex_per_line(buf, '->(finalize|dispose)\s*=')
+        ret = _find_regex_per_line(buf, '->(finalize|dispose)\s*=')
 
-		if not ret:
-			return None
+        if not ret:
+            return None
 
-		ret[1].forward_to_line_end()
+        ret[1].forward_to_line_end()
 
-		buf.insert(ret[1], '\n\n\tobject_class->get_property = %s_get_property;' % (funcprefix,))
-		buf.insert(ret[1], '\n\tobject_class->set_property = %s_set_property;\n' % (funcprefix,))
+        buf.insert(ret[1], '\n\n\tobject_class->get_property = %s_get_property;' % (funcprefix,))
+        buf.insert(ret[1], '\n\tobject_class->set_property = %s_set_property;\n' % (funcprefix,))
 
-		for i in (['get', ''], ['set', 'const ']):
-			ret = buf.get_iter_at_mark(mark)
+        for i in (['get', ''], ['set', 'const ']):
+            ret = buf.get_iter_at_mark(mark)
 
-			s = """static void\n%s_%s_property (GObject *object, guint prop_id, %sGValue *value, GParamSpec *pspec)
+            s = """static void\n%s_%s_property (GObject *object, guint prop_id, %sGValue *value, GParamSpec *pspec)
 {
-	%s *self = %s (object);
+    %s *self = %s (object);
 
-	switch (prop_id)
-	{
-		default:
-			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-		break;
-	}
+    switch (prop_id)
+    {
+        default:
+            G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
 }
 
 """ % (funcprefix, i[0], i[1], namespec[0], '_'.join(namespec[1]).upper())
 
-			ret.set_line_offset(0)
-			buf.insert(ret, s)
+            ret.set_line_offset(0)
+            buf.insert(ret, s)
 
-		buf.delete_mark(mark)
-		ret = _find_regex_per_line(buf, '%s_%s_property\s*\\(' % (funcprefix, pref))
+        buf.delete_mark(mark)
+        ret = _find_regex_per_line(buf, '%s_%s_property\s*\\(' % (funcprefix, pref))
 
-	ret = _find_regex_per_line(buf, 'default:', ret[1])
+    ret = _find_regex_per_line(buf, 'default:', ret[1])
 
-	if not ret:
-		return None
+    if not ret:
+        return None
 
-	ret[0].set_line_offset(0)
-	return ret[0]
+    ret[0].set_line_offset(0)
+    return ret[0]
 
 def add_prop(view, entry, name=None, proptype=None):
-	buf = view.get_buffer()
+    """Add a GObject property: gobj.add-prop [name] [type]
 
-	namespec = _get_type_name(buf)
+Add a GObject property in a C source file. This adds all the relevant stubs
+in the correct places. All property types are supported and can be completed."""
+    buf = view.get_buffer()
 
-	if not namespec:
-		raise commander.commands.exceptions.Execute('Could not determine gobject type name...')
+    namespec = _get_type_name(buf)
 
-	if not name:
-		name, words, modifier = (yield commander.commands.result.Prompt('Property name:'))
+    if not namespec:
+        raise commander.commands.exceptions.Execute('Could not determine gobject type name...')
 
-	name = name.strip().replace('_', '-').replace(' ', '-')
-	enumname = name.replace('-', '_').upper()
+    if not name:
+        name, words, modifier = (yield commander.commands.result.Prompt('Property name:'))
 
-	start = buf.get_start_iter()
+    name = name.strip().replace('_', '-').replace(' ', '-')
+    enumname = name.replace('-', '_').upper()
 
-	ret = start.forward_search('PROP_' + enumname, 0)
+    start = buf.get_start_iter()
 
-	if ret:
-		raise commander.commands.exceptions.Execute('Property `%s\' already exists' % (name,))
+    ret = start.forward_search('PROP_' + enumname, 0)
 
-	if not proptype:
-		proptype, words, modifier = (yield commander.commands.result.Prompt('Type:', {'*': commander.commands.completion.words(_prop_types.keys())}))
+    if ret:
+        raise commander.commands.exceptions.Execute('Property `%s\' already exists' % (name,))
 
-	proptype  = proptype.strip()
+    if not proptype:
+        proptype, words, modifier = (yield commander.commands.result.Prompt('Type:', {'*': commander.commands.completion.words(_prop_types.keys())}))
 
-	if not proptype in _prop_types:
-		return
+    proptype  = proptype.strip()
 
-	nickdef = name.replace('-', ' ').capitalize()
+    if not proptype in _prop_types:
+        return
 
-	nick, words, modifier = (yield commander.commands.result.Prompt('Nick [' + nickdef + ']:'))
+    nickdef = name.replace('-', ' ').capitalize()
 
-	if not nick:
-		nick = nickdef
+    nick, words, modifier = (yield commander.commands.result.Prompt('Nick [' + nickdef + ']:'))
 
-	descdef = name.replace('-', ' ').title()
+    if not nick:
+        nick = nickdef
 
-	desc, words, modifier = (yield commander.commands.result.Prompt('Description [' + descdef + ']:'))
+    descdef = name.replace('-', ' ').title()
 
-	if not desc:
-		desc = descdef
+    desc, words, modifier = (yield commander.commands.result.Prompt('Description [' + descdef + ']:'))
 
-	comp = {'*': ['G_PARAM_READWRITE',
-	              'G_PARAM_READABLE',
-	              'G_PARAM_WRITABLE',
-	              'G_PARAM_READWRITE | G_PARAM_CONSTRUCT',
-	              'G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY',
-	              'G_PARAM_WRITABLE | G_PARAM_CONSTRUCT']}
+    if not desc:
+        desc = descdef
 
-	flags, words, modifier = (yield commander.commands.result.Prompt('Flags [G_PARAM_READWRITE]:', comp))
+    comp = {'*': ['G_PARAM_READWRITE',
+                  'G_PARAM_READABLE',
+                  'G_PARAM_WRITABLE',
+                  'G_PARAM_READWRITE | G_PARAM_CONSTRUCT',
+                  'G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY',
+                  'G_PARAM_WRITABLE | G_PARAM_CONSTRUCT']}
 
-	if not flags:
-		flags = 'G_PARAM_READWRITE'
+    flags, words, modifier = (yield commander.commands.result.Prompt('Flags [G_PARAM_READWRITE]:', comp))
 
-	pspec = _prop_types[proptype](name, nick, desc, flags)
-	yield pspec.read()
+    if not flags:
+        flags = 'G_PARAM_READWRITE'
 
-	buf.begin_user_action()
+    pspec = _prop_types[proptype](name, nick, desc, flags)
+    yield pspec.read()
 
-	# Find where to insert the relevant parts
-	enumins = _find_prop_enum(buf)
+    buf.begin_user_action()
 
-	if not enumins:
-		buf.end_user_action()
-		raise commander.commands.exceptions.Execute('Could not determine where to insert the property enum...')
+    # Find where to insert the relevant parts
+    enumins = _find_prop_enum(buf)
 
-	enummark = buf.create_mark(None, enumins)
+    if not enumins:
+        buf.end_user_action()
+        raise commander.commands.exceptions.Execute('Could not determine where to insert the property enum...')
 
-	getins = _find_prop_get_set(buf, namespec, True)
+    enummark = buf.create_mark(None, enumins)
 
-	if not getins:
-		buf.delete_mark(enummark)
-		buf.end_user_action()
-		raise commander.commands.exceptions.Execute('Could not determine the get_property...')
+    getins = _find_prop_get_set(buf, namespec, True)
 
-	getmark = buf.create_mark(None, getins)
+    if not getins:
+        buf.delete_mark(enummark)
+        buf.end_user_action()
+        raise commander.commands.exceptions.Execute('Could not determine the get_property...')
 
-	setins = _find_prop_get_set(buf, namespec, False)
+    getmark = buf.create_mark(None, getins)
 
-	if not setins:
-		buf.delete_mark(enummark)
-		buf.delete_mark(getmark)
-		buf.end_user_action()
+    setins = _find_prop_get_set(buf, namespec, False)
 
-		raise commander.commands.exceptions.Execute('Could not determine the set_property...')
+    if not setins:
+        buf.delete_mark(enummark)
+        buf.delete_mark(getmark)
+        buf.end_user_action()
 
-	setmark = buf.create_mark(None, setins)
+        raise commander.commands.exceptions.Execute('Could not determine the set_property...')
 
-	buf.insert(buf.get_iter_at_mark(enummark), ",\n\tPROP_%s" % (enumname))
+    setmark = buf.create_mark(None, setins)
 
-	if 'READ' in flags:
-		buf.insert(buf.get_iter_at_mark(getmark), "\t\tcase PROP_%s:\n\t\t\t/* TODO */\n\t\tbreak;\n" % (enumname,))
+    buf.insert(buf.get_iter_at_mark(enummark), ",\n\tPROP_%s" % (enumname))
 
-	if 'WRIT' in flags:
-		buf.insert(buf.get_iter_at_mark(setmark), "\t\tcase PROP_%s:\n\t\t\t/* TODO */\n\t\tbreak;\n" % (enumname,))
+    if 'READ' in flags:
+        buf.insert(buf.get_iter_at_mark(getmark), "\t\tcase PROP_%s:\n\t\t\t/* TODO */\n\t\tbreak;\n" % (enumname,))
 
-	buf.delete_mark(enummark)
-	buf.delete_mark(getmark)
-	buf.delete_mark(setmark)
+    if 'WRIT' in flags:
+        buf.insert(buf.get_iter_at_mark(setmark), "\t\tcase PROP_%s:\n\t\t\t/* TODO */\n\t\tbreak;\n" % (enumname,))
 
-	ret = _find_class_init(buf, namespec)
-	ret = _find_regex_per_line(buf, '^}$', ret)
+    buf.delete_mark(enummark)
+    buf.delete_mark(getmark)
+    buf.delete_mark(setmark)
 
-	w = "\n\t".join(pspec.write().splitlines())
-	buf.insert(ret[0], "\n%s\n" % (w,))
-	buf.end_user_action()
+    ret = _find_class_init(buf, namespec)
+    ret = _find_regex_per_line(buf, '^}$', ret)
+
+    w = "\n\t".join(pspec.write().splitlines())
+    buf.insert(ret[0], "\n%s\n" % (w,))
+    buf.end_user_action()
+
+# vi:ts=4:et
