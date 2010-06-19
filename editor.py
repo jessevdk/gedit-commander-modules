@@ -34,6 +34,11 @@ def _search_paren(piter, search_for, skip_classes, last=None, stack=None):
     return True
 
 def break_function(view):
+    """Break function call over several lines
+
+Break a C function call over seperate lines, indenting each line appropriately.
+Execute with the cursor on the line where the function call starts."""
+
     buf = view.get_buffer()
     start = buf.get_iter_at_mark(buf.get_insert())
 
