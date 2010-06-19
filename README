@@ -1,0 +1,6 @@
+Some useful gedit commander modules. You will need the latest git version
+of gedit-plugins for the 'gobj' module to work.
+
+Install:
+	mkdir -p ~/.gnome2/gedit/commander/modules
+	cp *.py ~/.gnome2/gedit/commander/modules/
