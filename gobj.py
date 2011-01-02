@@ -23,7 +23,12 @@ class ParamSpec:
         pass
 
     def spec_name(self):
-        return self.__class__.__name__.lstrip('ParamSpec').lower()
+        name = self.__class__.__name__
+
+        if name.startswith('ParamSpec'):
+            name = name[len('ParamSpec'):]
+
+        return name.lower()
 
     def format_str(self, s):
         if s.startswith('"') or s.startswith('_("'):
@@ -136,7 +141,7 @@ class ParamSpecEnum(ParamSpecTyped):
         ParamSpec.__init__(self, name, nick, desc, flags)
 
     def read(self):
-        ParamSpecTyped.read(self)
+        yield ParamSpecTyped.read(self)
 
         default, words, modifier = (yield commander.commands.result.Prompt('Default: [0]'))
 
@@ -194,13 +199,15 @@ class ParamSpecString(ParamSpec):
         ParamSpec.__init__(self, name, nick, desc, flags)
 
     def read(self):
-        default, words, modifier = (yield commander.commands.result.Prompt('Default [""]:'))
+        default, words, modifier = (yield commander.commands.result.Prompt('Default [NULL]:'))
 
         if not default:
-            default = '""'
+            default = 'NULL'
 
-        if not default.startswith('"') and not default.startswith('_("'):
+        if not default.startswith('"') and not default.startswith('_("') and default != 'NULL':
             default = '"' + default.replace('"', '\\"') + '"'
+
+        self.args.append(default)
 
         yield True
 
@@ -354,14 +361,14 @@ def _find_prop_get_set(buf, namespec, isget):
 
             s = """static void\n%s_%s_property (GObject *object, guint prop_id, %sGValue *value, GParamSpec *pspec)
 {
-    %s *self = %s (object);
+	%s *self = %s (object);
 
-    switch (prop_id)
-    {
-        default:
-            G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-        break;
-    }
+	switch (prop_id)
+	{
+		default:
+			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+		break;
+	}
 }
 
 """ % (funcprefix, i[0], i[1], namespec[0], '_'.join(namespec[1]).upper())
@@ -413,26 +420,26 @@ in the correct places. All property types are supported and can be completed."""
     if not proptype in _prop_types:
         return
 
-    nickdef = name.replace('-', ' ').capitalize()
+    nickdef = name.replace('-', ' ').title()
 
     nick, words, modifier = (yield commander.commands.result.Prompt('Nick [' + nickdef + ']:'))
 
     if not nick:
         nick = nickdef
 
-    descdef = name.replace('-', ' ').title()
+    descdef = name.replace('-', ' ').capitalize()
 
     desc, words, modifier = (yield commander.commands.result.Prompt('Description [' + descdef + ']:'))
 
     if not desc:
         desc = descdef
 
-    comp = {'*': ['G_PARAM_READWRITE',
+    comp = {'*': commander.commands.completion.words(['G_PARAM_READWRITE',
                   'G_PARAM_READABLE',
                   'G_PARAM_WRITABLE',
                   'G_PARAM_READWRITE | G_PARAM_CONSTRUCT',
                   'G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY',
-                  'G_PARAM_WRITABLE | G_PARAM_CONSTRUCT']}
+                  'G_PARAM_WRITABLE | G_PARAM_CONSTRUCT'])}
 
     flags, words, modifier = (yield commander.commands.result.Prompt('Flags [G_PARAM_READWRITE]:', comp))
 
@@ -476,10 +483,10 @@ in the correct places. All property types are supported and can be completed."""
     buf.insert(buf.get_iter_at_mark(enummark), ",\n\tPROP_%s" % (enumname))
 
     if 'READ' in flags:
-        buf.insert(buf.get_iter_at_mark(getmark), "\t\tcase PROP_%s:\n\t\t\t/* TODO */\n\t\tbreak;\n" % (enumname,))
+        buf.insert(buf.get_iter_at_mark(getmark), "\t\tcase PROP_%s:\n\t\t\t/* TODO */\n\t\t\tbreak;\n" % (enumname,))
 
     if 'WRIT' in flags:
-        buf.insert(buf.get_iter_at_mark(setmark), "\t\tcase PROP_%s:\n\t\t\t/* TODO */\n\t\tbreak;\n" % (enumname,))
+        buf.insert(buf.get_iter_at_mark(setmark), "\t\tcase PROP_%s:\n\t\t\t/* TODO */\n\t\t\tbreak;\n" % (enumname,))
 
     buf.delete_mark(enummark)
     buf.delete_mark(getmark)
@@ -489,7 +496,7 @@ in the correct places. All property types are supported and can be completed."""
     ret = _find_regex_per_line(buf, '^}$', ret)
 
     w = "\n\t".join(pspec.write().splitlines())
-    buf.insert(ret[0], "\n%s\n" % (w,))
+    buf.insert(ret[0], "%s\n" % (w,))
     buf.end_user_action()
 
 # vi:ts=4:et
