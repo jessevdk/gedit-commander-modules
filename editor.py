@@ -60,6 +60,18 @@ Execute with the cursor on the line where the function call starts."""
     if not _search_paren(start, '(', skip_classes):
         return
 
+    ident = start.copy()
+
+    if ident.backward_word_start():
+        end = ident.copy()
+        end.forward_word_end()
+
+        if ident.get_text(end) in ['for', 'if', 'while', 'do']:
+            start.forward_char()
+
+            if not _search_paren(start, '(', skip_classes):
+                return
+
     openparen = start.copy()
     start.forward_char()
 
