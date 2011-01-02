@@ -5,9 +5,9 @@ import commander.commands.exceptions
 
 __commander_module__ = True
 
-def _search_paren(piter, search_for, skip_classes, last=None, stack=None):
+def _search_paren(piter, search_for, skip_classes, last=None, stackon=None, stackoff=None):
     buf = piter.get_buffer()
-    level = 1
+    level = 0
 
     while True:
         if last and piter.compare(last) >= 0:
@@ -15,13 +15,13 @@ def _search_paren(piter, search_for, skip_classes, last=None, stack=None):
 
         ch = piter.get_char()
 
-        if ch == stack:
-            level += 1
-        elif ch == search_for:
-            level -= 1
+        if level == 0 and ch == search_for:
+            break
 
-            if level == 0:
-                break
+        if ch == stackon:
+            level += 1
+        elif ch == stackoff:
+            level -= 1
 
         if not piter.forward_char():
             return False
@@ -64,7 +64,7 @@ Execute with the cursor on the line where the function call starts."""
     start.forward_char()
 
     # Find close paren
-    if not _search_paren(start, ')', skip_classes, None, '('):
+    if not _search_paren(start, ')', skip_classes, None, '(', ')'):
         return
 
     closeparen = start.copy()
@@ -77,7 +77,7 @@ Execute with the cursor on the line where the function call starts."""
 
     # Find seperators
     while True:
-        if not _search_paren(next, ',', skip_classes, closeparen):
+        if not _search_paren(next, ',', skip_classes, closeparen, '(', ')'):
             break
 
         breaks.append(next.get_offset() - offset)
