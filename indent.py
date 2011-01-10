@@ -242,6 +242,9 @@ class Declaration:
         self.replace(buf, self.args_marks, os.linesep.join(args))
 
 def cheader(view):
+    """Reindent C function declarations: indent.cheader
+
+Reindents C function declarations in the current selection."""
     buf = view.get_buffer()
 
     bounds = buf.get_selection_bounds()
