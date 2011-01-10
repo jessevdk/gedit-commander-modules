@@ -6,6 +6,7 @@ import commander.commands.exceptions
 import re
 
 __commander_module__ = True
+
 HideTagName = 'CommanderModuleGrepHideTag'
 ZoomOutTagName = 'CommanderModuleGrepZoomOutTag'
 HighlightTagName = 'CommanderModuleGrepHighlightTag'
