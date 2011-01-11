@@ -8,6 +8,137 @@ import os
 
 __commander_module__ = True
 
+class Argument:
+    def __init__(self, typ, ptr, name):
+        self.typ = re.sub('\s+', ' ', typ.strip())
+        self.ptr = ptr
+        self.name = name
+
+    def typ_len(self):
+        return len(self.typ)
+
+    def name_len(self):
+        return len(self.name)
+
+    def ptr_len(self):
+        return len(self.ptr)
+
+class Declaration:
+    def __init__(self, buf, start, match):
+        self.match = match
+
+        argre = re.compile('^(.+?)([ *]+)([a-z_][a-z0-9_]*)$')
+
+        self.typ = re.sub('\s+', ' ', match.group(1).strip())
+        self.ptr = match.group(2).strip()
+        self.name = match.group(3).strip()
+        self.args = [self.match_arg(argre, x.strip()) for x in match.group(4).split(',')]
+
+        self.max_argtyp = max(self.args, key=lambda x: x.typ_len())
+        self.max_argname = max(self.args, key=lambda x: x.name_len())
+        self.max_argptr = max(self.args, key=lambda x: x.ptr_len())
+
+        self.typ_marks = self.create_marks(buf, start, match, 1, 2, True)
+        self.name_marks = self.create_marks(buf, start, match, 3, 3, False)
+        self.args_marks = self.create_marks(buf, start, match, 4, 4, False)
+
+    def match_arg(self, argre, arg):
+        if arg == 'void':
+            return Argument(arg, '', '')
+        else:
+            match = argre.match(arg)
+
+            return Argument(match.group(1), match.group(2).replace(' ', ''), match.group(3))
+
+    def ptr_len(self):
+        return len(self.ptr)
+
+    def typ_len(self):
+        return len(self.typ)
+
+    def name_len(self):
+        return len(self.name)
+
+    def argtyp_len(self):
+        return self.max_argtyp.typ_len()
+
+    def argname_len(self):
+        return self.max_argname.name_len()
+
+    def argptr_len(self):
+        return self.max_argptr.ptr_len()
+
+    def create_marks(self, buf, start, match, grps, grpe, linestart):
+        start = start.copy()
+        end = start.copy()
+
+        start.forward_chars(match.start(grps))
+
+        if linestart and not start.starts_line():
+            start.set_line_offset(0)
+
+        end.forward_chars(match.end(grpe))
+
+        mstart = buf.create_mark(None, start, False)
+        mend = buf.create_mark(None, end, False)
+
+        return [mstart, mend]
+
+    def replace(self, buf, marks, s):
+        start = buf.get_iter_at_mark(marks[0])
+        end = buf.get_iter_at_mark(marks[1])
+
+        buf.delete(start, end)
+        buf.insert(start, s)
+
+        buf.delete_mark(marks[0])
+        buf.delete_mark(marks[1])
+
+    def align(self, buf, typlen, ptrlen, namelen, argtyplen, argptrlen, argnamelen):
+        tlen = typlen.typ_len()
+
+        typdiff = typlen.typ_len() - self.typ_len()
+        ptrdiff = ptrlen.ptr_len() - self.ptr_len()
+        namediff = namelen.name_len() - self.name_len()
+
+        typ = '%s %s%s' % (self.typ, ' ' * (typdiff + ptrdiff), self.ptr)
+
+        self.replace(buf, self.typ_marks, typ)
+
+        name = '%s%s ' % (self.name, ' ' * namediff)
+
+        self.replace(buf, self.name_marks, name)
+
+        iter = buf.get_iter_at_mark(self.args_marks[0])
+        offset = iter.get_line_offset()
+
+        args = []
+
+        atlen = argtyplen.argtyp_len()
+        aplen = argptrlen.argptr_len()
+        anlen = argnamelen.argname_len()
+
+        for i in xrange(0, len(self.args)):
+            a = self.args[i]
+            arg = ''
+
+            atypdiff = atlen - a.typ_len()
+            aptrdiff = aplen - a.ptr_len()
+            anamediff = anlen - a.name_len()
+
+            if i != 0:
+                arg += ' ' * offset
+
+            if a.name:
+                typ = '%s %s%s' % (a.typ, ' ' * (atypdiff + aptrdiff), a.ptr)
+            else:
+                typ = a.typ
+
+            arg += typ + a.name
+            args.append(arg)
+
+        self.replace(buf, self.args_marks, os.linesep.join(args))
+
 def _find_not_space(find):
     return not find.get_char().isspace()
 
@@ -102,158 +233,25 @@ def _indent_c(view, entry):
     else:
         raise commander.commands.exceptions.Execute('Nothing to indent')
 
-_language_handlers = {
-    'c': _indent_c,
-    'cpp': _indent_c,
-    'chdr': _indent_c
-}
-
-@commands.accelerator('<Control>i')
-def __default__(view, entry):
-    lang = view.get_buffer().get_language()
-
-    if lang:
-        lang = lang.get_id()
-
-    if not lang in _language_handlers:
-        raise commander.commands.exceptions.Execute('Indentation rules not available for this language')
-
-    return _language_handlers[lang](view, entry)
-
-class Argument:
-    def __init__(self, typ, ptr, name):
-        self.typ = re.sub('\s+', ' ', typ.strip())
-        self.ptr = ptr
-        self.name = name
-
-    def typ_len(self):
-        return len(self.typ) + 1 + len(self.ptr)
-
-    def name_len(self):
-        return len(self.name)
-
-class Declaration:
-    def __init__(self, buf, start, match):
-        self.match = match
-
-        argre = re.compile('(.+?)([ *]+)([a-z_][a-z0-9_]*)')
-
-        self.typ = re.sub('\s+', ' ', match.group(1).strip())
-        self.ptr = match.group(2).strip()
-        self.name = match.group(3).strip()
-        self.args = [self.match_arg(argre, x.strip()) for x in match.group(4).splitlines()]
-
-        self.max_argtyp = max(self.args, key=lambda x: x.typ_len())
-        self.max_argname = max(self.args, key=lambda x: x.name_len())
-
-        self.typ_marks = self.create_marks(buf, start, match, 1, 2, True)
-        self.name_marks = self.create_marks(buf, start, match, 3, 3, False)
-        self.args_marks = self.create_marks(buf, start, match, 4, 4, False)
-
-    def match_arg(self, argre, arg):
-        if arg == 'void':
-            return Argument(arg, '', '')
-        else:
-            match = argre.match(arg)
-
-            return Argument(match.group(1), match.group(2).replace(' ', ''), match.group(3))
-
-    def typ_len(self):
-        return len(self.typ) + 1 + len(self.ptr)
-
-    def name_len(self):
-        return len(self.name)
-
-    def argtyp_len(self):
-        return self.max_argtyp.typ_len()
-
-    def argname_len(self):
-        return self.max_argname.name_len()
-
-    def create_marks(self, buf, start, match, grps, grpe, linestart):
-        start = start.copy()
-        end = start.copy()
-
-        start.forward_chars(match.start(grps))
-
-        if linestart and not start.starts_line():
-            start.set_line_offset(0)
-
-        end.forward_chars(match.end(grpe))
-
-        mstart = buf.create_mark(None, start, False)
-        mend = buf.create_mark(None, end, False)
-
-        mstart.set_visible(True)
-        mend.set_visible(True)
-
-        return [mstart, mend]
-
-    def replace(self, buf, marks, s):
-        start = buf.get_iter_at_mark(marks[0])
-        end = buf.get_iter_at_mark(marks[1])
-
-        buf.delete(start, end)
-        buf.insert(start, s)
-
-        buf.delete_mark(marks[0])
-        buf.delete_mark(marks[1])
-
-    def align(self, buf, typlen, namelen, argnamelen, argtyplen, toff, taoff):
-        tlen = typlen.typ_len()
-
-        if self.ptr:
-            typ = '%s %s%s' % (self.typ, ' ' * (tlen - self.typ_len() + toff), self.ptr)
-        else:
-            typ = '%s%s' % (self.typ, ' ' * (tlen - self.typ_len() + 1 + toff))
-
-        self.replace(buf, self.typ_marks, typ)
-
-        name = '%s%s ' % (self.name, ' ' * (namelen.name_len() - self.name_len()))
-
-        self.replace(buf, self.name_marks, name)
-
-        iter = buf.get_iter_at_mark(self.args_marks[0])
-        offset = iter.get_line_offset()
-
-        args = []
-
-        atlen = argtyplen.argtyp_len()
-        anlen = argnamelen.argname_len()
-
-        for i in xrange(0, len(self.args)):
-            a = self.args[i]
-            arg = ''
-
-            if i != 0:
-                arg += ' ' * offset
-
-            if a.ptr:
-                typ = '%s %s%s' % (a.typ, ' ' * (atlen - a.typ_len() + taoff), a.ptr)
-            elif a.name:
-                typ = '%s%s' % (a.typ, ' ' * (atlen - a.typ_len() + 1 + taoff))
-            else:
-                typ = a.typ
-
-            arg += typ + a.name
-
-            args.append(arg)
-
-        self.replace(buf, self.args_marks, os.linesep.join(args))
-
-def cheader(view):
-    """Reindent C function declarations: indent.cheader
-
-Reindents C function declarations in the current selection."""
+def _indent_chdr(view, entry):
     buf = view.get_buffer()
 
     bounds = buf.get_selection_bounds()
 
     if not bounds:
-        raise commander.commands.exceptions.Execute('No selection')
+        start = buf.get_iter_at_mark(buf.get_insert())
 
-    start = bounds[0]
-    end = bounds[1]
+        end = start.copy()
+
+        if not _forward_find_char(end, _find_char(';', 'comment', 'string')):
+            raise commander.commands.exceptions.Execute('Could not find end of line to indent')
+
+        reselect = False
+    else:
+        start = bounds[0]
+        end = bounds[1]
+
+        reselect = True
 
     marks = [buf.create_mark(None, start, True),
              buf.create_mark(None, end, False)]
@@ -271,18 +269,21 @@ Reindents C function declarations in the current selection."""
 
     typlen = None
     namelen = None
+    ptrlen = None
     argtyplen = None
     argnamelen = None
+    argptrlen = None
 
     decls = []
-    toff = 0
-    taoff = 0
 
     for m in r.finditer(text):
         decl = Declaration(buf, start, m)
 
         if not typlen or decl.typ_len() > typlen.typ_len():
             typlen = decl
+
+        if not ptrlen or decl.ptr_len() > ptrlen.ptr_len():
+            ptrlen = decl
 
         if not namelen or decl.name_len() > namelen.name_len():
             namelen = decl
@@ -293,13 +294,8 @@ Reindents C function declarations in the current selection."""
         if not argnamelen or decl.argname_len() > argnamelen.argname_len():
             argnamelen = decl
 
-        if len(decl.ptr) > toff:
-            toff = len(decl.ptr)
-
-        aptr = max(decl.args, key=lambda x: len(x.ptr))
-
-        if aptr > taoff:
-            taoff = aptr
+        if not argptrlen or decl.argptr_len() > argptrlen.argptr_len():
+            argptrlen = decl
 
         decls.append(decl)
 
@@ -307,14 +303,35 @@ Reindents C function declarations in the current selection."""
 
     # Replace everything
     for decl in decls:
-        decl.align(buf, typlen, namelen, argtyplen, argnamelen, toff, taoff)
+        decl.align(buf, typlen, ptrlen, namelen, argtyplen, argptrlen, argnamelen)
 
-    buf.select_range(buf.get_iter_at_mark(marks[0]),
-                     buf.get_iter_at_mark(marks[1]))
+    if reselect:
+        buf.select_range(buf.get_iter_at_mark(marks[0]),
+                         buf.get_iter_at_mark(marks[1]))
+    else:
+        buf.place_cursor(buf.get_iter_at_mark(marks[0]))
 
     buf.delete_mark(marks[0])
     buf.delete_mark(marks[1])
 
     buf.end_user_action()
+
+_language_handlers = {
+    'c': _indent_c,
+    'cpp': _indent_c,
+    'chdr': _indent_chdr
+}
+
+@commands.accelerator('<Control>i')
+def __default__(view, entry):
+    lang = view.get_buffer().get_language()
+
+    if lang:
+        lang = lang.get_id()
+
+    if not lang in _language_handlers:
+        raise commander.commands.exceptions.Execute('Indentation rules not available for this language')
+
+    return _language_handlers[lang](view, entry)
 
 # vi:ex:ts=4:et
