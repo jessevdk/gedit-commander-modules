@@ -137,7 +137,7 @@ class Declaration:
             arg += typ + a.name
             args.append(arg)
 
-        self.replace(buf, self.args_marks, os.linesep.join(args))
+        self.replace(buf, self.args_marks, ('%s%s' % (',', os.linesep)).join(args))
 
 def _find_not_space(find):
     return not find.get_char().isspace()
