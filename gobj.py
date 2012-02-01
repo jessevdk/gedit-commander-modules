@@ -328,6 +328,32 @@ def _find_class_init(buf, namespec):
 
     return ret[0]
 
+def _arg_indent(func, args):
+    smax = [0, 0, 0]
+
+    for i in args:
+        for p in (0, 1, 2):
+            l = len(i[p])
+
+            if l > smax[p]:
+                smax[p] = l
+
+    ret = [func + ' (']
+    flen = len(ret[0])
+
+    for i in xrange(0, len(args)):
+        tp = args[i][0].ljust(smax[0] + 1)
+        pt = args[i][1].rjust(smax[1])
+
+        s = tp + pt + args[i][2]
+
+        if i == 0:
+            ret[0] += s
+        else:
+            ret.append(' ' * flen + s)
+
+    return ",\n".join(ret) + ')'
+
 def _find_prop_get_set(buf, namespec, isget):
     funcprefix = '_'.join(namespec[1]).lower()
 
@@ -359,7 +385,17 @@ def _find_prop_get_set(buf, namespec, isget):
         for i in (['get', ''], ['set', 'const ']):
             ret = buf.get_iter_at_mark(mark)
 
-            s = """static void\n%s_%s_property (GObject *object, guint prop_id, %sGValue *value, GParamSpec *pspec)
+            params = [
+                ('GObject', '*', 'object'),
+                ('guint', '', 'prop_id'),
+                (i[1] + 'GValue', '*', 'value'),
+                ('GParamSpec', '*', 'pspec')
+            ]
+
+            funcname = "%s_%s_property" % (funcprefix, i[0])
+
+            s = """static void
+%s
 {
 	%s *self = %s (object);
 
@@ -371,7 +407,7 @@ def _find_prop_get_set(buf, namespec, isget):
 	}
 }
 
-""" % (funcprefix, i[0], i[1], namespec[0], '_'.join(namespec[1]).upper())
+""" % (_arg_indent(funcname, params), namespec[0], '_'.join(namespec[1]).upper())
 
             ret.set_line_offset(0)
             buf.insert(ret, s)
