@@ -443,7 +443,7 @@ in the correct places. All property types are supported and can be completed."""
 
     start = buf.get_start_iter()
 
-    ret = start.forward_search('PROP_' + enumname, 0)
+    ret = start.forward_search('PROP_' + enumname, 0, None)
 
     if ret:
         raise commander.commands.exceptions.Execute('Property `%s\' already exists' % (name,))
