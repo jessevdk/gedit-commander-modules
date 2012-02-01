@@ -94,14 +94,22 @@ class Declaration:
         buf.delete_mark(marks[0])
         buf.delete_mark(marks[1])
 
-    def align(self, buf, typlen, ptrlen, namelen, argtyplen, argptrlen, argnamelen):
+    def align(self, buf, typlen, ptrlen, namelen, argtyplen, argptrlen, argnamelen, typenl = False):
         tlen = typlen.typ_len()
 
         typdiff = typlen.typ_len() - self.typ_len()
         ptrdiff = ptrlen.ptr_len() - self.ptr_len()
         namediff = namelen.name_len() - self.name_len()
 
-        typ = '%s %s%s' % (self.typ, ' ' * (typdiff + ptrdiff), self.ptr)
+        if not typenl:
+            typ = '%s %s%s' % (self.typ, ' ' * (typdiff + ptrdiff), self.ptr)
+        else:
+            typ = self.typ
+
+            if self.ptr:
+                typ += ' ' + self.ptr
+
+            typ += "\n"
 
         self.replace(buf, self.typ_marks, typ)
 
@@ -233,7 +241,7 @@ def _indent_c(view, entry):
     else:
         raise commander.commands.exceptions.Execute('Nothing to indent')
 
-def _indent_chdr(view, entry):
+def _indent_cdecl_real(view, entry, isdecl):
     buf = view.get_buffer()
 
     bounds = buf.get_selection_bounds()
@@ -243,7 +251,8 @@ def _indent_chdr(view, entry):
 
         end = start.copy()
 
-        if not _forward_find_char(end, _find_char(';', 'comment', 'string')):
+        if (isdecl and not _forward_find_char(end, _find_char(';', 'comment', 'string'))) or \
+           (not isdecl and not _forward_find_char(end, _find_char('{', 'comment', 'string'))):
             raise commander.commands.exceptions.Execute('Could not find end of line to indent')
 
         reselect = False
@@ -262,7 +271,12 @@ def _indent_chdr(view, entry):
     if not end.ends_line():
         end.forward_to_line_end()
 
-    r = re.compile('\s*([^(]+?)(\**)([a-z_][a-z0-9_]*\s*)\(([^)]*)\)[^;]*;\s*', re.M)
+    reg = '\s*([^(]+?)(\**)([a-z_][a-z0-9_]*\s*)\(([^)]*)\)'
+
+    if isdecl:
+        reg += '[^;]*;\s*'
+
+    r = re.compile(reg, re.M)
 
     text = start.get_text(end)
     repl = re.compile('\s+')
@@ -303,7 +317,7 @@ def _indent_chdr(view, entry):
 
     # Replace everything
     for decl in decls:
-        decl.align(buf, typlen, ptrlen, namelen, argtyplen, argptrlen, argnamelen)
+        decl.align(buf, typlen, ptrlen, namelen, argtyplen, argptrlen, argnamelen, not isdecl)
 
     if reselect:
         buf.select_range(buf.get_iter_at_mark(marks[0]),
@@ -316,10 +330,13 @@ def _indent_chdr(view, entry):
 
     buf.end_user_action()
 
+def _indent_cdecl(view, entry):
+    return _indent_cdecl_real(view, entry, True)
+
 _language_handlers = {
     'c': _indent_c,
     'cpp': _indent_c,
-    'chdr': _indent_chdr
+    'chdr': _indent_cdecl
 }
 
 @commands.accelerator('<Control>i')
@@ -333,5 +350,11 @@ def __default__(view, entry):
         raise commander.commands.exceptions.Execute('Indentation rules not available for this language')
 
     return _language_handlers[lang](view, entry)
+
+def cdecl(view, entry):
+    return _indent_cdecl(view, entry)
+
+def cfunc(view, entry):
+    return _indent_cdecl_real(view, entry, False)
 
 # vi:ex:ts=4:et
