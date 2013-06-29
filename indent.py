@@ -201,13 +201,15 @@ def _indent_c(view, entry):
     start = bounds[0].copy()
 
     if not _forward_find_char(start, _find_not_space, bounds[1]):
-        raise commander.commands.exceptions.Execute('Nothing to indent')
+        # Try indenting cfunc instead
+        return _indent_cdecl_real(view, entry, False)
 
     # Find where to indent on
     indenton = start.copy()
 
     if not _forward_find_char(indenton, _find_char('(', 'comment', 'string'), bounds[1]):
-        raise commander.commands.exceptions.Execute('Nothing to indent')
+        # Try indenting cfunc instead
+        return _indent_cdecl_real(view, entry, False)
 
     indenton.forward_char()
 
